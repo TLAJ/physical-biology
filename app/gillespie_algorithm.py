@@ -1,59 +1,59 @@
 # coding: utf-8
-'''
+"""
 Created on 2015/09/14
 
 @author: Kaoru
-'''
+"""
 import numpy as np
 import matplotlib.pyplot as plt
+from gillespie import gillespie
+
 ##Gillespie Algorithm:
 ##Solve the simple case of a promoter expressing mRNA
 ##at a constant rate where the mRNA can in turn decay.
 
 ##Defining some parameters:
 ##new mRNA is produced approximately every 3.3 seconds
-r = 20 #probability of mRNA production per unit time: [min^-1]
+r = 20  # probability of mRNA production per unit time: [min^-1]
 
 ##life time of 1.5 minutes measured for the mRNA
-gamma = 1/1.5 #probability of mRNA decay per mRNA and unit time: [min^-1]
+gamma = 1 / 1.5  # probability of mRNA decay per mRNA and unit time: [min^-1]
 
 ##Iterations of the algorithm: for each iteration we will flip a coin.
-MaxT = 500;
+MaxT = 500
 
 ##Simulations start with no mRNA
-m = np.empty(MaxT+1)
-tau = np.empty(MaxT) #Time to the next reaction
-m[0] = 0 #initial condition = 0
+m = np.empty(MaxT + 1)
+tau = np.empty(MaxT)  # Time to the next reaction
+m[0] = 0  # initial condition = 0
+v = [r, 0]
 
 for i in range(MaxT):
-  k1 = r
-  k2 = m[i]*gamma
-  k0  = k1 + k2 #Sum of all probabilities per unit time
-  
-  ##Determine the vector tau
-  tau[i] = 1/k0 * np.log(1/np.random.rand()) #Uniform probability between 0 and 1
-  
-  ##Flip a coin to determine which one of the reactions will take place
-  CoinFlip = np.random.rand()
-  
-  ##mRNA production / mRNA decay
-  if CoinFlip <= k1/k0:
-    m[i+1] = m[i]+1
-  else:
-    m[i+1] = m[i]-1
+    v[0] = r
+    v[1] = m[i] * gamma
+
+    ##Determine the vector tau
+    gillespie_res = gillespie.get_next_time_reaction(v)
+    tau[i] = gillespie_res.next_time
+
+    ##mRNA production / mRNA decay
+    if gillespie_res.next_reaction == 0:
+        m[i + 1] = m[i] + 1
+    else:
+        m[i + 1] = m[i] - 1
 
 
 ##Calculate the time axis
-T = np.empty(MaxT+1)
+T = np.empty(MaxT + 1)
 T[0] = 0
 
 for i in range(MaxT):
-  T[i+1] = np.sum(tau[0:i])
+    T[i + 1] = np.sum(tau[0:i])
 
 ##Plot results with the deterministic solution
 plt.figure()
-plt.plot(T,m)
-plt.plot(T,r/gamma*(1-np.exp(-T*gamma)), "-k")
+plt.plot(T, m)
+plt.plot(T, r / gamma * (1 - np.exp(-T * gamma)), "-k")
 plt.xlabel("time (min)")
 plt.ylabel("number of mRNA molecules")
 
@@ -61,36 +61,33 @@ plt.show(block=False)
 
 ##Distribution in steady state
 r = 20
-gamma = 1/1.5
+gamma = 1 / 1.5
 MaxT = 10000
 
 ##Simulations start with no mRNA
-m = np.empty(MaxT+1)
-tau = np.empty(MaxT) #Time to the next reaction
-m[0] = np.round(r/gamma) #Notice the different initial condition
+m = np.empty(MaxT + 1, dtype=np.int16)
+tau = np.empty(MaxT)  # Time to the next reaction
+m[0] = np.round(r / gamma)  # Notice the different initial condition
 
 for i in range(MaxT):
-  k1 = r
-  k2 = m[i]*gamma
-  k0  = k1 + k2 #Sum of all probabilities per unit time
-  
-  ##Determine the vector tau
-  tau[i] = 1/k0 #Average
-  
-  ##Flip a coin to determine which one of the reactions will take place
-  CoinFlip = np.random.rand()
-  
-  ##mRNA production / mRNA decay
-  if CoinFlip <= k1/k0:
-    m[i+1] = m[i]+1
-  else:
-    m[i+1] = m[i]-1
+    v[0] = r
+    v[1] = m[i] * gamma
+
+    ##Determine the vector tau
+    gillespie_res = gillespie.get_next_time_reaction(v)
+    tau[i] = gillespie_res.next_time
+
+    ##mRNA production / mRNA decay
+    if gillespie_res.next_reaction == 0:
+        m[i + 1] = m[i] + 1
+    else:
+        m[i + 1] = m[i] - 1
 
 ##Check simulation to see if it follows a Poisson distribution
 ##Variance should be equal to the mean
 ##Weighting each mRNA occurence using the time over which it existed
-MeanM = np.sum(m[0:-1]*tau)/np.sum(tau)
-SecondMoment = np.sum(np.power(m[0:-1],2)*tau)/np.sum(tau)
+MeanM = np.sum(m[0:-1] * tau) / np.sum(tau)
+SecondMoment = np.sum(np.power(m[0:-1], 2) * tau) / np.sum(tau)
 
 VarianceM = SecondMoment - MeanM**2
 
@@ -98,20 +95,21 @@ VarianceM = SecondMoment - MeanM**2
 ##Finding a certain number of mRNA molecules is related to the period of time
 MaxmRNA = int(np.max(m))
 
-p = np.zeros(MaxmRNA) #Observed number of mRNA molecules with length MaxmRNA
+p = np.zeros(MaxmRNA)  # Observed number of mRNA molecules with length MaxmRNA
 
-for i in range(MaxT): #Time that number existed until next reaction
-  p[m[i]-1] = p[m[i]-1] + tau[i]
+for i in range(MaxT):  # Time that number existed until next reaction
+    p[m[i] - 1] = p[m[i] - 1] + tau[i]
 ##Normalize the distribution
-p = p/np.sum(p)
+p = p / np.sum(p)
 
 ##Plot histogram of p with expected Poisson distribution
 plt.figure()
-plt.bar(range(1,MaxmRNA+1), p)
+plt.bar(range(1, MaxmRNA + 1), p)
 from scipy.stats import poisson
+
 X = range(MaxmRNA)
-Y = poisson.pmf(X, r/gamma)
-plt.plot(X,Y,"-r")
+Y = poisson.pmf(X, r / gamma)
+plt.plot(X, Y, "-r")
 plt.xlabel("number of mRNA molecules")
 plt.ylabel("probability")
 plt.legend(["Poisson distribution", "Simulation"])
