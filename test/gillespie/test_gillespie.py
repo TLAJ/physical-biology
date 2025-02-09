@@ -1,5 +1,6 @@
-from app.gillespie import gillespie
+from physbiol.gillespie import gillespie
 from unittest import TestCase
+
 
 class TestGillespie(TestCase):
     def test_get_next_time_reaction(self):

@@ -2,7 +2,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# from sympy import *
 
 N_NS = 10000000.0
 T = 298.0
